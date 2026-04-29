@@ -16,8 +16,8 @@
           <div class="brand-name">Claude Code</div>
         </div>
         <div class="sidebar-head-actions">
-          <button id="new-chat" class="new-chat" title="New chat (Ctrl+L)">＋</button>
-          <button id="collapse-sidebar" class="new-chat" title="Collapse sidebar (Ctrl+B)">⟨</button>
+          <button id="new-chat" class="new-chat" title="New chat (Ctrl+L)" aria-label="New chat">＋</button>
+          <button id="collapse-sidebar" class="new-chat" title="Collapse sidebar (Ctrl+B)" aria-label="Collapse sidebar">⟨</button>
         </div>
       </div>
 
@@ -25,7 +25,7 @@
         <div class="section-label">Working directory</div>
         <div class="cwd-row">
           <div id="cwd-display" class="cwd-display" title="Click to change">~</div>
-          <button id="pick-cwd" class="icon-btn" title="Pick folder">📁</button>
+          <button id="pick-cwd" class="icon-btn" title="Pick folder" aria-label="Pick working directory">📁</button>
         </div>
       </div>
 
@@ -45,11 +45,11 @@
     </aside>
 
     <main id="main">
-      <button id="expand-sidebar" class="expand-sidebar hidden" title="Show sidebar (Ctrl+B)">⟩</button>
+      <button id="expand-sidebar" class="expand-sidebar hidden" title="Show sidebar (Ctrl+B)" aria-label="Show sidebar">⟩</button>
       <div id="auth-banner" class="auth-banner hidden">
         <div class="auth-banner-text">You're not logged into Claude. Chat won't work until you authenticate.</div>
         <button id="auth-banner-btn" class="confirm-btn">Log in</button>
-        <button id="auth-banner-dismiss" class="auth-banner-dismiss" title="Dismiss">×</button>
+        <button id="auth-banner-dismiss" class="auth-banner-dismiss" title="Dismiss" aria-label="Dismiss">×</button>
       </div>
       <div id="update-banner" class="update-banner hidden">
         <div class="update-banner-text">
@@ -61,14 +61,14 @@
       </div>
       <div id="tabstrip" class="tabstrip">
         <div id="tabs" class="tabs"></div>
-        <button id="new-tab-btn" class="new-tab-btn" title="New tab (Ctrl+T)">＋</button>
+        <button id="new-tab-btn" class="new-tab-btn" title="New tab (Ctrl+T)" aria-label="New tab">＋</button>
       </div>
       <header id="top">
         <div class="top-right">
           <div id="context-meter" class="context-meter" title="Context used">
             <div class="meter-track"><div id="meter-fill" class="meter-fill"></div></div>
             <div id="meter-text" class="meter-text">0 / 200k</div>
-            <button id="compact-btn" class="compact-btn" title="Compact the conversation to free up context">Compact</button>
+            <button id="compact-btn" class="compact-btn" title="Compact the conversation to free up context" aria-label="Compact conversation">Compact</button>
           </div>
           <select id="model-select" class="model-select" title="Model">
             <option value="">Default model</option>
@@ -85,7 +85,7 @@
             <option value="max" selected>max</option>
           </select>
           <div class="export-wrap">
-            <button id="export-btn" class="icon-btn" title="Export conversation">⬇</button>
+            <button id="export-btn" class="icon-btn" title="Export conversation" aria-label="Export conversation" aria-haspopup="menu">⬇</button>
             <div id="export-menu" class="export-menu hidden">
               <div class="export-menu-item" data-action="copy">
                 <span class="export-menu-icon">📋</span>
@@ -97,13 +97,13 @@
               </div>
             </div>
           </div>
-          <button id="settings-btn" class="icon-btn" title="Settings">⚙</button>
+          <button id="settings-btn" class="icon-btn" title="Settings" aria-label="Settings">⚙</button>
         </div>
       </header>
 
       <div id="messages-wrap" class="messages-wrap">
         <div id="messages-container" class="messages-container"></div>
-        <button id="scroll-to-bottom" class="scroll-to-bottom hidden" title="Scroll to latest">
+        <button id="scroll-to-bottom" class="scroll-to-bottom hidden" title="Scroll to latest" aria-label="Scroll to latest">
           <span class="scroll-arrow">↓</span>
           <span class="scroll-badge hidden">!</span>
         </button>
@@ -112,9 +112,9 @@
       <div id="find-bar" class="find-bar hidden">
         <input id="find-input" type="text" placeholder="Find in conversation…" />
         <div id="find-count" class="find-count">0/0</div>
-        <button id="find-prev" class="icon-btn" title="Previous (Shift+Enter)">↑</button>
-        <button id="find-next" class="icon-btn" title="Next (Enter)">↓</button>
-        <button id="find-close" class="icon-btn" title="Close (Esc)">×</button>
+        <button id="find-prev" class="icon-btn" title="Previous (Shift+Enter)" aria-label="Previous match">↑</button>
+        <button id="find-next" class="icon-btn" title="Next (Enter)" aria-label="Next match">↓</button>
+        <button id="find-close" class="icon-btn" title="Close (Esc)" aria-label="Close find">×</button>
       </div>
 
       <div id="typing-bar" class="typing-bar hidden">
@@ -148,7 +148,7 @@
         <div id="attachments" class="attachments"></div>
         <div class="composer-row">
           <div class="attach-wrap">
-            <button id="attach-btn" class="icon-btn big" title="Attach image">📎</button>
+            <button id="attach-btn" class="icon-btn big" title="Attach image" aria-label="Attach image" aria-haspopup="menu">📎</button>
             <div id="attach-menu" class="attach-menu hidden">
               <div class="attach-menu-item" data-action="upload">
                 <span class="attach-menu-icon">📂</span>
@@ -164,8 +164,8 @@
             <textarea id="input" placeholder="Reply to Claude…  (paste images, drag-drop files, / for commands, ↑ to edit last)" rows="1"></textarea>
             <div id="slash-popup" class="slash-popup hidden"></div>
           </div>
-          <button id="send-btn" class="send-btn" title="Send (Enter)">↑</button>
-          <button id="stop-btn" class="send-btn stop hidden" title="Stop (Esc)">■</button>
+          <button id="send-btn" class="send-btn" title="Send (Enter)" aria-label="Send message">↑</button>
+          <button id="stop-btn" class="send-btn stop hidden" title="Stop (Esc)" aria-label="Stop generation">■</button>
         </div>
         <div class="composer-hint">
           <span id="composer-hint-text">Enter to send · Shift+Enter newline · / for commands · Ctrl+V to paste image</span>
@@ -177,7 +177,7 @@
   <div id="settings-panel" class="settings-panel hidden">
     <div class="settings-head">
       <div class="settings-title">Settings</div>
-      <button id="settings-close" class="icon-btn">×</button>
+      <button id="settings-close" class="icon-btn" title="Close" aria-label="Close settings">×</button>
     </div>
     <div class="settings-body">
       <label class="settings-row">

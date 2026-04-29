@@ -134,6 +134,22 @@ body {
 .icon-btn:hover { background: var(--bg-hover); color: var(--text); }
 .icon-btn.big { padding: 8px 10px; font-size: 16px; }
 
+/* ---------- Global focus ring ---------- */
+/* Keyboard-only focus outline. Mouse clicks don't trigger :focus-visible so
+   this stays out of the way for pointer users. */
+button:focus-visible,
+select:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+.session-item:focus-visible,
+.tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+/* Links in messages get an underline-style focus to match text context. */
+.msg .body a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 .session-list {
   flex: 1; overflow-y: auto; overflow-x: hidden;
   margin: 0 -14px; padding: 0 14px;

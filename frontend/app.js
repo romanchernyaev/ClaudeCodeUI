@@ -27,6 +27,19 @@ function apiReady() {
   });
 }
 
+// App-level events from Python (not tied to a specific tab's streaming).
+let _sessionsRefreshQueued = false;
+window.__onAppEvent = (name) => {
+  if (name !== "sessions_changed") return;
+  if (_sessionsRefreshQueued) return;
+  _sessionsRefreshQueued = true;
+  // Small debounce — a flurry of mtime changes during an active turn can arrive back-to-back.
+  setTimeout(async () => {
+    _sessionsRefreshQueued = false;
+    try { await refreshSessions(); } catch {}
+  }, 800);
+};
+
 // Incoming events from Python. `tab_id` routes to the correct tab.
 window.__onClaudeEvent = (ev) => {
   const tab = state.tabs.find(t => t.id === ev.tab_id);

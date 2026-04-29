@@ -54,7 +54,7 @@ HERE = Path(__file__).resolve().parent
 if str(HERE) not in sys.path:
     sys.path.insert(0, str(HERE))
 
-from session_reader import list_projects, list_sessions, load_session, session_usage, delete_session
+from session_reader import list_projects, list_sessions, load_session, session_usage, delete_session, CLAUDE_PROJECTS
 from session_meta import set_title as _set_title, set_pinned as _set_pinned
 from claude_runner import ClaudeSession, find_claude_cli
 from slash_commands import list_slash_commands
@@ -107,6 +107,51 @@ def _push_event(tab_id: str, ev: dict):
         _window.evaluate_js(f"window.__onClaudeEvent({payload})")
     except Exception:
         pass
+
+
+def _push_window_event(name: str):
+    """Broadcast a tab-less event to the frontend (e.g. sessions list changed)."""
+    if _window is None:
+        return
+    try:
+        _window.evaluate_js(f"window.__onAppEvent && window.__onAppEvent({json.dumps(name)})")
+    except Exception:
+        pass
+
+
+def _sessions_watcher(poll_seconds: float = 3.0):
+    """Poll ~/.claude/projects/ for any mtime change; notify the UI when it sees one."""
+    import time
+    last_fingerprint: tuple | None = None
+    while True:
+        try:
+            time.sleep(poll_seconds)
+            if not CLAUDE_PROJECTS.exists():
+                continue
+            # Fingerprint = (project_dir mtime, count of .jsonl files per project, their mtimes)
+            parts: list[tuple] = []
+            for d in CLAUDE_PROJECTS.iterdir():
+                if not d.is_dir():
+                    continue
+                try:
+                    files = []
+                    for f in d.iterdir():
+                        if f.is_file() and f.suffix == ".jsonl":
+                            try:
+                                files.append((f.name, int(f.stat().st_mtime)))
+                            except OSError:
+                                pass
+                    files.sort()
+                    parts.append((d.name, tuple(files)))
+                except OSError:
+                    continue
+            fp = tuple(parts)
+            if last_fingerprint is not None and fp != last_fingerprint:
+                _push_window_event("sessions_changed")
+            last_fingerprint = fp
+        except Exception:
+            # Keep the thread alive across transient errors (disk churn, Dropbox lock, etc).
+            pass
 
 
 def _make_callback(tab_id: str):
@@ -423,6 +468,7 @@ def main():
         background_color="#1a1a1a",
     )
     print("window created, calling webview.start(gui='edgechromium')", flush=True)
+    threading.Thread(target=_sessions_watcher, daemon=True, name="SessionsWatcher").start()
     webview.start(gui="edgechromium", debug=False)
     print("webview.start returned", flush=True)
 

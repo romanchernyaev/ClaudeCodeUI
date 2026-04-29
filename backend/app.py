@@ -58,6 +58,29 @@ from session_reader import list_projects, list_sessions, load_session, session_u
 from session_meta import set_title as _set_title, set_pinned as _set_pinned
 from claude_runner import ClaudeSession, find_claude_cli
 from slash_commands import list_slash_commands
+from version import __version__ as APP_VERSION
+
+GITHUB_OWNER = "romanchernyaev"
+GITHUB_REPO = "ClaudeCodeUI"
+RELEASES_PAGE_URL = f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
+RELEASES_API_URL = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
+
+
+def _is_newer(remote: str, local: str) -> bool:
+    """Semver-ish comparison. Accepts '0.1.0' or '0.1.0-rc.1'. Returns True if remote > local."""
+    def parts(v: str) -> tuple[int, ...]:
+        core = v.split("-", 1)[0]
+        out: list[int] = []
+        for p in core.split("."):
+            try:
+                out.append(int(p))
+            except ValueError:
+                out.append(0)
+        return tuple(out)
+    try:
+        return parts(remote) > parts(local)
+    except Exception:
+        return False
 
 
 def _frontend_dir() -> Path:
@@ -307,6 +330,54 @@ class Api:
                 shell=False,
                 creationflags=subprocess.CREATE_NEW_CONSOLE if hasattr(subprocess, "CREATE_NEW_CONSOLE") else 0,
             )
+            return {"ok": True}
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    def get_version(self):
+        return {"version": APP_VERSION}
+
+    def check_updates(self):
+        """Query GitHub for the latest release and compare with the baked-in version.
+
+        Returns {current, latest, update_available, release_url, error}. Safe on network failure.
+        """
+        current = APP_VERSION
+        result = {
+            "current": current,
+            "latest": None,
+            "update_available": False,
+            "release_url": RELEASES_PAGE_URL,
+            "error": None,
+        }
+        if current == "dev":
+            result["error"] = "Dev build — skip update check"
+            return result
+        try:
+            import urllib.request
+            req = urllib.request.Request(
+                RELEASES_API_URL,
+                headers={"Accept": "application/vnd.github+json", "User-Agent": f"ClaudeCodeUI/{current}"},
+            )
+            with urllib.request.urlopen(req, timeout=4) as r:
+                data = json.loads(r.read().decode("utf-8"))
+        except Exception as e:
+            result["error"] = str(e)
+            return result
+        tag = (data.get("tag_name") or "").lstrip("v")
+        result["latest"] = tag or None
+        if tag and _is_newer(tag, current):
+            result["update_available"] = True
+            result["release_url"] = data.get("html_url") or RELEASES_PAGE_URL
+        return result
+
+    def open_external_url(self, url: str):
+        """Open a URL in the user's default browser. Only http(s) allowed."""
+        if not isinstance(url, str) or not (url.startswith("http://") or url.startswith("https://")):
+            return {"ok": False, "error": "Invalid URL"}
+        try:
+            import webbrowser
+            webbrowser.open(url, new=2)
             return {"ok": True}
         except Exception as e:
             return {"ok": False, "error": str(e)}

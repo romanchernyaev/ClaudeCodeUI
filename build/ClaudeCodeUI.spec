@@ -23,6 +23,7 @@ a = Analysis(
         "claude_runner",
         "slash_commands",
         "screenshot",
+        "version",
         "PIL.ImageGrab",
         "tkinter",
     ],

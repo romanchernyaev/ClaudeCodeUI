@@ -833,6 +833,20 @@ body {
 }
 .auth-banner-dismiss:hover { background: rgba(255,255,255,0.1); }
 
+/* ---------- Update banner ---------- */
+.update-banner {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 16px;
+  background: rgba(74, 124, 89, 0.18);
+  border-bottom: 1px solid #2e5a3c;
+  color: #d6ead9;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.update-banner.hidden { display: none !important; }
+.update-banner-text { flex: 1; display: flex; align-items: center; gap: 8px; }
+.update-banner-versions { color: #9bbda3; font-size: 12px; }
+
 /* ---------- Auth settings row ---------- */
 .auth-row {
   display: flex; align-items: center; gap: 10px;

@@ -91,6 +91,27 @@ async function init() {
   initSidebarState();
   openNewTab(); // start with one empty tab
   checkAuthAndShowBanner();
+  checkForUpdates();
+}
+
+const UPDATE_DISMISS_KEY = "claudecodeui.update.dismissed";
+
+async function checkForUpdates() {
+  try {
+    const info = await window.pywebview.api.check_updates();
+    if (!info || !info.update_available || !info.latest) return;
+    let dismissed = "";
+    try { dismissed = localStorage.getItem(UPDATE_DISMISS_KEY) || ""; } catch {}
+    if (dismissed === info.latest) return; // user already said "no thanks" for this version
+    const banner = $("#update-banner");
+    const vers = $("#update-banner-versions");
+    if (vers) vers.textContent = `v${info.current} → v${info.latest}`;
+    banner.dataset.latest = info.latest;
+    banner.dataset.url = info.release_url || "";
+    banner.classList.remove("hidden");
+  } catch {
+    // Network failure, GitHub rate limit, etc — stay silent.
+  }
 }
 
 async function checkAuthAndShowBanner() {
@@ -1158,6 +1179,19 @@ function wireUI() {
   });
   $("#auth-banner-btn").addEventListener("click", triggerAuthLogin);
   $("#auth-banner-dismiss").addEventListener("click", () => $("#auth-banner").classList.add("hidden"));
+  $("#update-banner-btn").addEventListener("click", async () => {
+    const banner = $("#update-banner");
+    const url = banner.dataset.url || "https://github.com/romanchernyaev/ClaudeCodeUI/releases/latest";
+    try { await window.pywebview.api.open_external_url(url); } catch {}
+  });
+  $("#update-banner-dismiss").addEventListener("click", () => {
+    const banner = $("#update-banner");
+    const latest = banner.dataset.latest || "";
+    if (latest) {
+      try { localStorage.setItem(UPDATE_DISMISS_KEY, latest); } catch {}
+    }
+    banner.classList.add("hidden");
+  });
   $("#permission-mode").addEventListener("change", async (e) => {
     const t = activeTab(); if (!t) return;
     t.permissionMode = e.target.value;

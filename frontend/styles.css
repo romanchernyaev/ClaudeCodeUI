@@ -650,6 +650,26 @@ body {
 .msg.user:hover .edit-btn { opacity: 1; }
 .msg.user .edit-btn:hover { color: var(--text); background: var(--bg-hover); }
 
+/* ---------- Inline edit (branch/fork) ---------- */
+.inline-edit {
+  width: 100%; box-sizing: border-box;
+  background: var(--bg-1); color: var(--text);
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 8px 10px; font: inherit; resize: vertical; min-height: 60px;
+}
+.inline-edit:focus { outline: 1px solid var(--accent); outline-offset: -1px; }
+.inline-edit-actions {
+  display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end;
+}
+.fork-banner {
+  margin: 12px 12px; padding: 8px 12px;
+  background: rgba(217, 119, 87, 0.08);
+  border: 1px dashed var(--accent);
+  border-radius: 6px;
+  color: var(--text-faint);
+  font-size: 12px; text-align: center;
+}
+
 /* ---------- Settings panel ---------- */
 .settings-panel {
   position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);

@@ -632,11 +632,71 @@ function buildMessageNode(m) {
   msg.append(avatar, body);
   if (m.role === "user") {
     const editBtn = el("button", "edit-btn", "Edit");
-    editBtn.addEventListener("click", () => { $("#input").value = m.text; autosizeInput(); $("#input").focus(); });
+    editBtn.addEventListener("click", () => beginInlineEdit(wrap, body, m.text));
     msg.append(editBtn);
   }
   wrap.appendChild(msg);
   return wrap;
+}
+
+// ---------- Edit & branch (fork) ----------
+// Clicking Edit on a past user message replaces the bubble body with a textarea
+// and offers "Save & resend" (forks: hides subsequent messages and starts a new
+// session in this tab with the edited prompt) or "Cancel" (restores the original).
+function beginInlineEdit(wrapEl, bodyEl, originalText) {
+  const t = activeTab(); if (!t) return;
+  if (t.streaming) return; // can't fork mid-turn
+  // Snapshot the original body HTML so Cancel restores it.
+  const originalHTML = bodyEl.innerHTML;
+  const ta = document.createElement("textarea");
+  ta.className = "inline-edit";
+  ta.value = originalText;
+  ta.rows = Math.max(2, Math.min(10, originalText.split("\n").length + 1));
+  const actions = el("div", "inline-edit-actions");
+  const save = el("button", "confirm-btn", "Save & resend");
+  save.title = "Starts a new branch: subsequent messages are hidden and a fresh session begins with the edited prompt.";
+  const cancel = el("button", "auth-banner-dismiss", "Cancel");
+  cancel.style.background = "transparent";
+  cancel.style.color = "var(--text)";
+  actions.append(save, cancel);
+  bodyEl.innerHTML = "";
+  bodyEl.append(ta, actions);
+  ta.focus();
+  ta.select();
+
+  const restore = () => { bodyEl.innerHTML = originalHTML; };
+  cancel.addEventListener("click", restore);
+  ta.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { e.preventDefault(); restore(); }
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); save.click(); }
+  });
+  save.addEventListener("click", async () => {
+    const newText = ta.value.trim();
+    if (!newText) { restore(); return; }
+    // Hide this message and everything after it. A fork banner takes their place.
+    const container = t.messagesEl;
+    if (!container) return;
+    const children = Array.from(container.children);
+    const idx = children.indexOf(wrapEl);
+    if (idx === -1) { restore(); return; }
+    for (let i = idx; i < children.length; i++) children[i].remove();
+    const banner = el("div", "fork-banner");
+    banner.textContent = `Branched from an earlier message — new session starting.`;
+    container.appendChild(banner);
+    // Reset tab state for a fresh session. The old JSONL stays on disk; the user
+    // can recover it from the sidebar if they want to.
+    t.sessionId = null;
+    t.projectId = null;
+    t.currentAssistantEl = null;
+    t.currentAssistantText = "";
+    t.streamedViaDelta = false;
+    try {
+      await window.pywebview.api.start_conversation(t.id, t.cwd, t.model || null, t.effort || null, t.permissionMode);
+    } catch {}
+    $("#input").value = newText;
+    autosizeInput();
+    await send();
+  });
 }
 
 // ---------- Markdown via marked + hljs ----------
@@ -963,9 +1023,7 @@ function addUserBubble(t, text) {
     body.appendChild(atts);
   }
   const editBtn = el("button", "edit-btn", "Edit");
-  editBtn.addEventListener("click", () => {
-    $("#input").value = text; autosizeInput(); $("#input").focus();
-  });
+  editBtn.addEventListener("click", () => beginInlineEdit(wrap, body, text));
   msg.append(avatar, body, editBtn);
   wrap.appendChild(msg);
   t.messagesEl.appendChild(wrap);

@@ -1,6 +1,6 @@
 # ClaudeCodeUI
 
-Portable Claude Code desktop UI for Windows — no admin, no Electron.
+Portable Claude Code desktop UI for Windows — no admin, no install.
 
 ## Download
 
@@ -9,7 +9,6 @@ Latest build: **[ClaudeCodeUI.zip](https://github.com/romanchernyaev/ClaudeCodeU
 Unzip, double-click `ClaudeCodeUI.exe`. Prerequisites:
 - Windows 10/11 (WebView2 Runtime is already installed)
 - `claude` CLI on PATH (or at `~/.local/bin/claude.exe`)
-- Logged in once with `claude auth login`
 
 ## What it is
 

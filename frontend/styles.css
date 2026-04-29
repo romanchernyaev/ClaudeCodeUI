@@ -505,6 +505,37 @@ body {
 .attach-menu-item:hover { background: var(--bg-hover); }
 .attach-menu-icon { font-size: 15px; width: 20px; text-align: center; }
 
+/* ---------- Find bar (Ctrl+F) ---------- */
+.find-bar {
+  position: absolute; top: 12px; right: 20px;
+  display: flex; align-items: center; gap: 6px;
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 8px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+  z-index: 70;
+}
+.find-bar.hidden { display: none !important; }
+.find-bar input {
+  background: var(--bg-3); color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; padding: 6px 10px; font-size: 13px; width: 220px;
+  font-family: inherit;
+}
+.find-bar input:focus { outline: 1px solid var(--accent); outline-offset: -1px; }
+.find-count {
+  font-size: 11px; color: var(--text-dim); font-variant-numeric: tabular-nums;
+  min-width: 42px; text-align: center;
+}
+mark.find-hit {
+  background: rgba(217, 119, 87, 0.35);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+mark.find-hit.current {
+  background: var(--accent);
+  color: #fff;
+}
+
 /* ---------- Export menu (top bar) ---------- */
 .export-wrap { position: relative; }
 .export-menu {

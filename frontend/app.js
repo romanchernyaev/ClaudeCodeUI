@@ -920,6 +920,8 @@ function scheduleAssistantRender(t) {
     const existingThinking = t.currentAssistantEl.querySelector(".thinking-block");
     t.currentAssistantEl.innerHTML = renderMarkdown(t.currentAssistantText) + '<span class="cursor">▍</span>';
     if (existingThinking) t.currentAssistantEl.insertBefore(existingThinking, t.currentAssistantEl.firstChild);
+    // Re-apply find highlights if the find bar is open.
+    if (findState.query) runFind(findState.query);
   });
 }
 
@@ -1264,6 +1266,23 @@ function wireUI() {
     if (e.key === "Escape") { e.target.value = ""; state.searchQuery = ""; renderSessionsFiltered(); $("#input").focus(); }
   });
 
+  // Find-in-conversation wiring
+  const findInput = $("#find-input");
+  if (findInput) {
+    let findDebounce;
+    findInput.addEventListener("input", () => {
+      clearTimeout(findDebounce);
+      findDebounce = setTimeout(() => runFind(findInput.value), 120);
+    });
+    findInput.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); closeFindBar(); $("#input").focus(); }
+      else if (e.key === "Enter") { e.preventDefault(); stepFind(e.shiftKey ? -1 : 1); }
+    });
+    $("#find-next").addEventListener("click", () => stepFind(1));
+    $("#find-prev").addEventListener("click", () => stepFind(-1));
+    $("#find-close").addEventListener("click", () => { closeFindBar(); $("#input").focus(); });
+  }
+
   $("#export-btn").addEventListener("click", (e) => {
     e.stopPropagation();
     $("#export-menu").classList.toggle("hidden");
@@ -1360,6 +1379,7 @@ function wireUI() {
       return;
     }
     if (e.ctrlKey && e.key.toLowerCase() === "k") { e.preventDefault(); search.focus(); search.select(); return; }
+    if (e.ctrlKey && e.key.toLowerCase() === "f") { e.preventDefault(); openFindBar(); return; }
     if (e.ctrlKey && e.key.toLowerCase() === "b") { e.preventDefault(); toggleSidebar(); return; }
     if (e.ctrlKey && e.key === "Tab") {
       e.preventDefault();
@@ -1454,6 +1474,120 @@ function flashStatus(msg) {
   const prev = line.textContent;
   line.textContent = msg;
   setTimeout(() => { if (line.textContent === msg) line.textContent = prev; }, 3500);
+}
+
+// ---------- Find in conversation (Ctrl+F) ----------
+const findState = { hits: [], index: -1, query: "" };
+
+function openFindBar() {
+  const bar = $("#find-bar"); if (!bar) return;
+  bar.classList.remove("hidden");
+  const input = $("#find-input");
+  input.focus();
+  input.select();
+  // Seed with the current selection, if any.
+  const sel = window.getSelection();
+  if (sel && sel.toString().trim() && !input.value) {
+    input.value = sel.toString().trim().slice(0, 200);
+    runFind(input.value);
+  } else if (input.value) {
+    runFind(input.value);
+  }
+}
+
+function closeFindBar() {
+  const bar = $("#find-bar"); if (!bar) return;
+  bar.classList.add("hidden");
+  clearFindHighlights();
+  findState.hits = []; findState.index = -1; findState.query = "";
+  $("#find-count").textContent = "0/0";
+}
+
+function clearFindHighlights() {
+  const container = $("#messages-container");
+  if (!container) return;
+  container.querySelectorAll("mark.find-hit").forEach(m => {
+    const parent = m.parentNode;
+    while (m.firstChild) parent.insertBefore(m.firstChild, m);
+    parent.removeChild(m);
+    parent.normalize();
+  });
+}
+
+function runFind(query) {
+  clearFindHighlights();
+  findState.hits = []; findState.index = -1; findState.query = query;
+  if (!query || query.length < 1) {
+    $("#find-count").textContent = "0/0";
+    return;
+  }
+  const container = $("#messages-container");
+  if (!container) return;
+
+  const lower = query.toLowerCase();
+  // Walk text nodes, skipping scripts/styles and the find bar itself.
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      if (!node.nodeValue || !node.nodeValue.toLowerCase().includes(lower)) return NodeFilter.FILTER_REJECT;
+      let p = node.parentNode;
+      while (p && p !== container) {
+        const tag = p.nodeName;
+        if (tag === "SCRIPT" || tag === "STYLE") return NodeFilter.FILTER_REJECT;
+        if (p.classList && p.classList.contains("find-hit")) return NodeFilter.FILTER_REJECT;
+        p = p.parentNode;
+      }
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
+
+  const nodes = [];
+  let n;
+  while ((n = walker.nextNode())) nodes.push(n);
+
+  for (const node of nodes) {
+    const text = node.nodeValue;
+    const textLower = text.toLowerCase();
+    let start = 0;
+    const parent = node.parentNode;
+    const frag = document.createDocumentFragment();
+    let idx;
+    while ((idx = textLower.indexOf(lower, start)) !== -1) {
+      if (idx > start) frag.appendChild(document.createTextNode(text.slice(start, idx)));
+      const mark = document.createElement("mark");
+      mark.className = "find-hit";
+      mark.textContent = text.slice(idx, idx + query.length);
+      frag.appendChild(mark);
+      findState.hits.push(mark);
+      start = idx + query.length;
+    }
+    if (start < text.length) frag.appendChild(document.createTextNode(text.slice(start)));
+    parent.replaceChild(frag, node);
+  }
+
+  if (findState.hits.length > 0) {
+    findState.index = 0;
+    applyCurrentHit();
+  }
+  updateFindCount();
+}
+
+function applyCurrentHit() {
+  findState.hits.forEach((h, i) => h.classList.toggle("current", i === findState.index));
+  const cur = findState.hits[findState.index];
+  if (cur && cur.scrollIntoView) cur.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function updateFindCount() {
+  const total = findState.hits.length;
+  const label = total === 0 ? "0/0" : `${findState.index + 1}/${total}`;
+  $("#find-count").textContent = label;
+}
+
+function stepFind(dir) {
+  if (findState.hits.length === 0) return;
+  findState.index = (findState.index + dir + findState.hits.length) % findState.hits.length;
+  applyCurrentHit();
+  updateFindCount();
 }
 
 async function pickCwd() {

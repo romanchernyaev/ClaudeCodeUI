@@ -321,6 +321,30 @@ function closeSessionContextMenu() {
   if (m) m.remove();
 }
 
+function openLinkContextMenu(event, href) {
+  closeLinkContextMenu();
+  const menu = el("div", "ctx-menu");
+  menu.id = "link-ctx-menu";
+  const items = [
+    { label: "Open link in browser", action: () => { try { window.pywebview.api.open_external_url(href); } catch {} } },
+    { label: "Copy link address", action: () => { navigator.clipboard.writeText(href).catch(() => {}); } },
+  ];
+  items.forEach(it => {
+    const row = el("div", "ctx-item", it.label);
+    row.addEventListener("click", () => { closeLinkContextMenu(); it.action(); });
+    menu.appendChild(row);
+  });
+  document.body.appendChild(menu);
+  const x = Math.min(event.clientX, window.innerWidth - 200);
+  const y = Math.min(event.clientY, window.innerHeight - menu.offsetHeight - 10);
+  menu.style.left = x + "px"; menu.style.top = y + "px";
+  setTimeout(() => document.addEventListener("click", closeLinkContextMenu, { once: true }), 0);
+}
+function closeLinkContextMenu() {
+  const m = document.getElementById("link-ctx-menu");
+  if (m) m.remove();
+}
+
 function startInlineRename(s, itemEl) {
   const titleEl = itemEl.querySelector(".title");
   if (!titleEl) return;
@@ -1359,6 +1383,26 @@ function wireUI() {
       btn.textContent = "Copied!"; btn.classList.add("copied");
       setTimeout(() => { btn.textContent = "Copy"; btn.classList.remove("copied"); }, 1200);
     }).catch(() => { btn.textContent = "Failed"; });
+  });
+
+  // External links: route clicks to the default browser, and add a right-click
+  // menu with "Copy link address". Without this, WebView2 navigates in place
+  // and its native context menu doesn't expose link operations.
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest('a[href]');
+    if (!a) return;
+    const href = a.getAttribute('href') || '';
+    if (!/^https?:\/\//i.test(href)) return;
+    e.preventDefault();
+    try { window.pywebview.api.open_external_url(href); } catch {}
+  });
+  document.addEventListener("contextmenu", (e) => {
+    const a = e.target.closest('a[href]');
+    if (!a) return;
+    const href = a.getAttribute('href') || '';
+    if (!/^https?:\/\//i.test(href)) return;
+    e.preventDefault();
+    openLinkContextMenu(e, href);
   });
 
   // Global shortcuts

@@ -829,9 +829,25 @@ function appendAssistantText(t, text) {
   // Close thinking block — we're now speaking to the user.
   t.thinkingBlockEl = null;
   t.currentAssistantText += text;
-  t.currentAssistantEl.innerHTML = renderMarkdown(t.currentAssistantText) + '<span class="cursor">▍</span>';
+  scheduleAssistantRender(t);
   if (t.id === state.activeTabId) maybeAutoScroll(t);
   if (t.id !== state.activeTabId) { t.unread = true; renderTabs(); }
+}
+
+// Coalesce many deltas-per-second into one rAF paint.
+// Without this, every tiny token re-parses the whole message and re-runs
+// highlight.js — O(n²) over the length of a long reply.
+function scheduleAssistantRender(t) {
+  if (t.renderQueued) return;
+  t.renderQueued = true;
+  requestAnimationFrame(() => {
+    t.renderQueued = false;
+    if (!t.currentAssistantEl) return;
+    // Preserve any thinking block child — it's a separate DOM artifact.
+    const existingThinking = t.currentAssistantEl.querySelector(".thinking-block");
+    t.currentAssistantEl.innerHTML = renderMarkdown(t.currentAssistantText) + '<span class="cursor">▍</span>';
+    if (existingThinking) t.currentAssistantEl.insertBefore(existingThinking, t.currentAssistantEl.firstChild);
+  });
 }
 
 function appendThinkingText(t, text) {

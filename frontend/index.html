@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Claude Code</title>
+  <link rel="stylesheet" href="highlight-theme.css" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar">
+      <div class="sidebar-head">
+        <div class="brand">
+          <img class="logo-img" src="claude-logo.png" alt="" />
+          <div class="brand-name">Claude Code</div>
+        </div>
+        <div class="sidebar-head-actions">
+          <button id="new-chat" class="new-chat" title="New chat (Ctrl+L)">＋</button>
+          <button id="collapse-sidebar" class="new-chat" title="Collapse sidebar (Ctrl+B)">⟨</button>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="section-label">Working directory</div>
+        <div class="cwd-row">
+          <div id="cwd-display" class="cwd-display" title="Click to change">~</div>
+          <button id="pick-cwd" class="icon-btn" title="Pick folder">📁</button>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="section-label">Search</div>
+        <input id="session-search" class="session-search" placeholder="Search chats (Ctrl+K)…" />
+      </div>
+
+      <div class="sidebar-section flex-1">
+        <div class="section-label"><span id="recent-label">Recent chats</span></div>
+        <div id="session-list" class="session-list"></div>
+      </div>
+
+      <div class="sidebar-foot">
+        <div id="status-line" class="status-line">—</div>
+      </div>
+    </aside>
+
+    <main id="main">
+      <button id="expand-sidebar" class="expand-sidebar hidden" title="Show sidebar (Ctrl+B)">⟩</button>
+      <div id="auth-banner" class="auth-banner hidden">
+        <div class="auth-banner-text">You're not logged into Claude. Chat won't work until you authenticate.</div>
+        <button id="auth-banner-btn" class="confirm-btn">Log in</button>
+        <button id="auth-banner-dismiss" class="auth-banner-dismiss" title="Dismiss">×</button>
+      </div>
+      <div id="tabstrip" class="tabstrip">
+        <div id="tabs" class="tabs"></div>
+        <button id="new-tab-btn" class="new-tab-btn" title="New tab (Ctrl+T)">＋</button>
+      </div>
+      <header id="top">
+        <div class="top-right">
+          <div id="context-meter" class="context-meter" title="Context used">
+            <div class="meter-track"><div id="meter-fill" class="meter-fill"></div></div>
+            <div id="meter-text" class="meter-text">0 / 200k</div>
+            <button id="compact-btn" class="compact-btn" title="Compact the conversation to free up context">Compact</button>
+          </div>
+          <select id="model-select" class="model-select" title="Model">
+            <option value="">Default model</option>
+            <option value="claude-opus-4-7">Opus 4.7</option>
+            <option value="claude-sonnet-4-6">Sonnet 4.6</option>
+            <option value="claude-haiku-4-5-20251001">Haiku 4.5</option>
+          </select>
+          <select id="effort-select" class="model-select" title="Effort level">
+            <option value="">Effort: default</option>
+            <option value="low">low</option>
+            <option value="medium">medium</option>
+            <option value="high">high</option>
+            <option value="xhigh">xhigh</option>
+            <option value="max" selected>max</option>
+          </select>
+          <button id="settings-btn" class="icon-btn" title="Settings">⚙</button>
+        </div>
+      </header>
+
+      <div id="messages-wrap" class="messages-wrap">
+        <div id="messages-container" class="messages-container"></div>
+        <button id="scroll-to-bottom" class="scroll-to-bottom hidden" title="Scroll to latest">
+          <span class="scroll-arrow">↓</span>
+          <span class="scroll-badge hidden">!</span>
+        </button>
+      </div>
+
+      <div id="typing-bar" class="typing-bar hidden">
+        <svg class="typing-robot" viewBox="0 0 64 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <!-- antenna -->
+          <line x1="32" y1="4" x2="32" y2="1" stroke="#d97757" stroke-width="1.2" stroke-linecap="round"/>
+          <circle cx="32" cy="1.2" r="1.2" fill="#d97757" class="antenna-blob"/>
+          <!-- head -->
+          <rect x="24" y="4" width="16" height="12" rx="3" fill="#d97757"/>
+          <!-- eyes -->
+          <circle class="eye left"  cx="28.5" cy="10" r="1.6" fill="#1a1a1a"/>
+          <circle class="eye right" cx="35.5" cy="10" r="1.6" fill="#1a1a1a"/>
+          <!-- mouth -->
+          <rect x="30" y="12.5" width="4" height="1" rx="0.5" fill="#1a1a1a" opacity="0.6"/>
+          <!-- body -->
+          <rect x="22" y="16" width="20" height="12" rx="2.5" fill="#d97757"/>
+          <!-- laptop lid (screen) -->
+          <rect x="16" y="30" width="32" height="12" rx="1.5" fill="#2a2a2a" stroke="#444"/>
+          <rect x="18" y="32" width="28" height="8" fill="#1e2636"/>
+          <!-- laptop base -->
+          <path d="M 10 42 L 54 42 L 58 46 L 6 46 Z" fill="#333"/>
+          <rect x="30" y="43" width="4" height="1" rx="0.5" fill="#555"/>
+          <!-- left arm -->
+          <rect class="arm arm-left"  x="18.5" y="22" width="3" height="10" rx="1.2" fill="#d97757"/>
+          <!-- right arm -->
+          <rect class="arm arm-right" x="42.5" y="22" width="3" height="10" rx="1.2" fill="#d97757"/>
+        </svg>
+        <div class="typing-text">Claude is working<span class="typing-dots"><span>.</span><span>.</span><span>.</span></span></div>
+      </div>
+      <div id="composer" class="composer">
+        <div id="attachments" class="attachments"></div>
+        <div class="composer-row">
+          <div class="attach-wrap">
+            <button id="attach-btn" class="icon-btn big" title="Attach image">📎</button>
+            <div id="attach-menu" class="attach-menu hidden">
+              <div class="attach-menu-item" data-action="upload">
+                <span class="attach-menu-icon">📂</span>
+                <span>Upload from PC…</span>
+              </div>
+              <div class="attach-menu-item" data-action="screenshot">
+                <span class="attach-menu-icon">✂️</span>
+                <span>Take a screenshot</span>
+              </div>
+            </div>
+          </div>
+          <div class="input-wrap">
+            <textarea id="input" placeholder="Reply to Claude…  (paste images, drag-drop files, / for commands, ↑ to edit last)" rows="1"></textarea>
+            <div id="slash-popup" class="slash-popup hidden"></div>
+          </div>
+          <button id="send-btn" class="send-btn" title="Send (Enter)">↑</button>
+          <button id="stop-btn" class="send-btn stop hidden" title="Stop (Esc)">■</button>
+        </div>
+        <div class="composer-hint">
+          <span id="composer-hint-text">Enter to send · Shift+Enter newline · / for commands · Ctrl+V to paste image</span>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="settings-panel" class="settings-panel hidden">
+    <div class="settings-head">
+      <div class="settings-title">Settings</div>
+      <button id="settings-close" class="icon-btn">×</button>
+    </div>
+    <div class="settings-body">
+      <label class="settings-row">
+        <div class="settings-label">Permission mode</div>
+        <select id="permission-mode" class="model-select">
+          <option value="bypassPermissions" selected>bypassPermissions (no prompts)</option>
+          <option value="default">default</option>
+          <option value="acceptEdits">acceptEdits</option>
+          <option value="auto">auto</option>
+          <option value="plan">plan</option>
+          <option value="dontAsk">dontAsk</option>
+        </select>
+      </label>
+      <label class="settings-row">
+        <div class="settings-label">CLI path</div>
+        <div id="settings-cli-path" class="settings-value">—</div>
+      </label>
+      <div class="settings-row">
+        <div class="settings-label">Claude authentication</div>
+        <div class="auth-row">
+          <div id="auth-status" class="auth-status">Checking…</div>
+          <button id="auth-login-btn" class="confirm-btn">Log in / Re-authenticate</button>
+        </div>
+        <div class="settings-hint">
+          Opens a terminal and runs <code>claude auth login</code>. Your browser will open for the login flow.
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-head">
+          <div class="settings-section-title">Theme</div>
+          <button id="theme-reset-btn" class="confirm-btn">Restore defaults</button>
+        </div>
+        <div class="settings-row">
+          <div class="settings-label">UI font</div>
+          <select id="theme-font" class="model-select"></select>
+        </div>
+        <div class="settings-row">
+          <div class="settings-label">Code font</div>
+          <select id="theme-code-font" class="model-select"></select>
+        </div>
+        <div id="theme-colors" class="theme-colors"></div>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="file-input" accept="image/*" multiple hidden />
+  <script src="marked.min.js"></script>
+  <script src="highlight.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

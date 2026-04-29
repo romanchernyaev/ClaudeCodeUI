@@ -1,0 +1,17 @@
+# PyInstaller build artifacts
+dist/
+build/ClaudeCodeUI/
+build-workpath/
+*.pyc
+__pycache__/
+
+# Local logs
+smoke_err.log
+smoke_out.log
+*.log
+
+# Editor / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

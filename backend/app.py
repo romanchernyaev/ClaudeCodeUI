@@ -98,6 +98,35 @@ _images_tmpdir = Path(tempfile.gettempdir()) / "claudecodeui_images"
 _images_tmpdir.mkdir(exist_ok=True)
 
 
+def _cleanup_old_images(max_age_hours: int = 24):
+    """Delete images older than max_age_hours from the temp dir.
+
+    Runs once at startup. Best-effort — any file in use / permission-denied is
+    simply skipped. Worst case the folder grows for a run; next startup will
+    clear it.
+    """
+    import time
+    try:
+        if not _images_tmpdir.exists():
+            return
+        cutoff = time.time() - (max_age_hours * 3600)
+        removed = 0
+        for f in _images_tmpdir.iterdir():
+            try:
+                if f.is_file() and f.stat().st_mtime < cutoff:
+                    f.unlink()
+                    removed += 1
+            except OSError:
+                pass
+        if removed:
+            print(f"cleaned {removed} stale image(s) from {_images_tmpdir}", flush=True)
+    except Exception:
+        pass
+
+
+_cleanup_old_images()
+
+
 def _push_event(tab_id: str, ev: dict):
     if _window is None:
         return

@@ -83,12 +83,17 @@ async function init() {
   const status = await window.pywebview.api.get_status();
   $("#status-line").textContent = status.cli ? "CLI: ready" : "CLI: NOT FOUND";
   state.defaultCwd = status.home;
-  state.cwd = status.home;
+  const saved = loadSettings();
+  state.cwd = saved.cwd || status.home;
   $("#cwd-display").textContent = shortenPath(state.cwd);
   state.slashCommands = await window.pywebview.api.get_slash_commands(state.cwd);
   await refreshSessions();
   wireUI();
   initSidebarState();
+  // Pre-populate selects from saved settings so the first tab inherits them
+  if (saved.model !== undefined) $("#model-select").value = saved.model;
+  if (saved.effort !== undefined) $("#effort-select").value = saved.effort;
+  if (saved.permissionMode !== undefined && $("#permission-mode")) $("#permission-mode").value = saved.permissionMode;
   openNewTab(); // start with one empty tab
   checkAuthAndShowBanner();
   checkForUpdates();
@@ -136,6 +141,21 @@ async function checkAuthAndShowBanner() {
   } catch (e) {
     // Network or silent error — leave banner as-is.
   }
+}
+
+const SETTINGS_KEY = "claudecodeui.settings";
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+function patchSettings(patch) {
+  try {
+    const cur = loadSettings();
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...cur, ...patch }));
+  } catch {}
 }
 
 const SIDEBAR_COLLAPSED_KEY = "claudecodeui.sidebar.collapsed";
@@ -1141,11 +1161,13 @@ function wireUI() {
   $("#model-select").addEventListener("change", async (e) => {
     const t = activeTab(); if (!t) return;
     t.model = e.target.value;
+    patchSettings({ model: t.model });
     await window.pywebview.api.update_runner_settings(t.id, t.model || null, t.effort || null, t.permissionMode);
   });
   $("#effort-select").addEventListener("change", async (e) => {
     const t = activeTab(); if (!t) return;
     t.effort = e.target.value;
+    patchSettings({ effort: t.effort });
     await window.pywebview.api.update_runner_settings(t.id, t.model || null, t.effort || null, t.permissionMode);
   });
 
@@ -1195,6 +1217,7 @@ function wireUI() {
   $("#permission-mode").addEventListener("change", async (e) => {
     const t = activeTab(); if (!t) return;
     t.permissionMode = e.target.value;
+    patchSettings({ permissionMode: t.permissionMode });
     await window.pywebview.api.update_runner_settings(t.id, t.model || null, t.effort || null, t.permissionMode);
   });
 
@@ -1246,6 +1269,7 @@ async function pickCwd() {
   const chosen = await window.pywebview.api.pick_directory();
   if (!chosen) return;
   state.cwd = chosen;
+  patchSettings({ cwd: chosen });
   $("#cwd-display").textContent = shortenPath(chosen);
   state.slashCommands = await window.pywebview.api.get_slash_commands(state.cwd);
   const t = activeTab(); if (t) {

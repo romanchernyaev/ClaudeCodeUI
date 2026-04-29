@@ -224,6 +224,30 @@ class Api:
             return res[0] if isinstance(res, (list, tuple)) else res
         return None
 
+    def save_markdown(self, default_filename: str, content: str):
+        """Open a save dialog and write `content` as UTF-8 to the chosen file.
+
+        Returns {'ok': bool, 'path': str|None, 'error': str|None}.
+        """
+        if _window is None:
+            return {"ok": False, "path": None, "error": "window not ready"}
+        try:
+            safe_name = default_filename or "conversation.md"
+            # Windows save_filename expects just the filename; directory handled by dialog
+            res = _window.create_file_dialog(
+                webview.SAVE_DIALOG,
+                save_filename=safe_name,
+                file_types=("Markdown (*.md)", "All files (*.*)"),
+            )
+            if not res:
+                return {"ok": False, "path": None, "error": None}  # user cancelled
+            path = res if isinstance(res, str) else res[0]
+            with open(path, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write(content)
+            return {"ok": True, "path": path, "error": None}
+        except Exception as e:
+            return {"ok": False, "path": None, "error": str(e)}
+
     def check_auth(self):
         """Return {'authenticated': bool, 'user': str|None, 'error': str|None}.
 

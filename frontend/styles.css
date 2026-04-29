@@ -505,6 +505,24 @@ body {
 .attach-menu-item:hover { background: var(--bg-hover); }
 .attach-menu-icon { font-size: 15px; width: 20px; text-align: center; }
 
+/* ---------- Export menu (top bar) ---------- */
+.export-wrap { position: relative; }
+.export-menu {
+  position: absolute; top: calc(100% + 6px); right: 0;
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 4px; min-width: 200px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  z-index: 60;
+}
+.export-menu.hidden { display: none; }
+.export-menu-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: 6px; cursor: pointer;
+  font-size: 13px; color: var(--text);
+}
+.export-menu-item:hover { background: var(--bg-hover); }
+.export-menu-icon { font-size: 15px; width: 20px; text-align: center; }
+
 /* ---------- Slash popup ---------- */
 .slash-popup {
   position: absolute; bottom: calc(100% + 6px); left: 0; right: 0;

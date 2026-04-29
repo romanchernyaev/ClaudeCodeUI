@@ -84,6 +84,19 @@
             <option value="xhigh">xhigh</option>
             <option value="max" selected>max</option>
           </select>
+          <div class="export-wrap">
+            <button id="export-btn" class="icon-btn" title="Export conversation">⬇</button>
+            <div id="export-menu" class="export-menu hidden">
+              <div class="export-menu-item" data-action="copy">
+                <span class="export-menu-icon">📋</span>
+                <span>Copy as markdown</span>
+              </div>
+              <div class="export-menu-item" data-action="save">
+                <span class="export-menu-icon">💾</span>
+                <span>Save as .md file…</span>
+              </div>
+            </div>
+          </div>
           <button id="settings-btn" class="icon-btn" title="Settings">⚙</button>
         </div>
       </header>

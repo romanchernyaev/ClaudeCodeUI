@@ -1193,6 +1193,25 @@ function wireUI() {
     if (e.key === "Escape") { e.target.value = ""; state.searchQuery = ""; renderSessionsFiltered(); $("#input").focus(); }
   });
 
+  $("#export-btn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    $("#export-menu").classList.toggle("hidden");
+  });
+  document.addEventListener("click", (e) => {
+    const menu = $("#export-menu");
+    if (!menu || menu.classList.contains("hidden")) return;
+    if (e.target.closest(".export-wrap")) return;
+    menu.classList.add("hidden");
+  });
+  document.querySelectorAll("#export-menu .export-menu-item").forEach(item => {
+    item.addEventListener("click", async () => {
+      const action = item.dataset.action;
+      $("#export-menu").classList.add("hidden");
+      if (action === "copy") await exportCopy();
+      else if (action === "save") await exportSave();
+    });
+  });
+
   $("#settings-btn").addEventListener("click", openSettings);
   $("#settings-close").addEventListener("click", closeSettings);
   $("#auth-login-btn").addEventListener("click", triggerAuthLogin);
@@ -1279,6 +1298,91 @@ function wireUI() {
       switchToTab(state.tabs[next].id);
     }
   });
+}
+
+// ---------- Export ----------
+function formatConversationAsMarkdown(tab, messages) {
+  const lines = [];
+  const title = tab.title || "Claude Code conversation";
+  lines.push(`# ${title}`, "");
+  const exportedAt = new Date().toISOString();
+  lines.push(`_Exported ${exportedAt}_`, "");
+  if (tab.cwd) lines.push(`- **Working directory:** \`${tab.cwd}\``);
+  if (tab.model) lines.push(`- **Model:** ${tab.model}`);
+  if (tab.sessionId) lines.push(`- **Session:** ${tab.sessionId}`);
+  lines.push("", "---", "");
+  for (const m of messages) {
+    if (m.role === "user") {
+      lines.push("## User", "", m.text || "", "");
+      if (m.has_image) lines.push("_[attachment: image]_", "");
+    } else if (m.role === "assistant") {
+      lines.push("## Claude", "");
+      if (m.text) lines.push(m.text, "");
+      if (Array.isArray(m.tools) && m.tools.length) {
+        for (const tc of m.tools) {
+          lines.push(`<details><summary>Tool call: \`${tc.name}\`</summary>`, "", "```json");
+          try { lines.push(JSON.stringify(tc.input, null, 2)); } catch { lines.push(String(tc.input || "")); }
+          lines.push("```", "", "</details>", "");
+        }
+      }
+    }
+  }
+  return lines.join("\n");
+}
+
+async function getExportMarkdown() {
+  const t = activeTab();
+  if (!t) return { ok: false, reason: "no tab" };
+  if (!t.sessionId || !t.projectId) {
+    return { ok: false, reason: "Start or load a conversation first." };
+  }
+  try {
+    const res = await window.pywebview.api.get_session(t.projectId, t.sessionId);
+    const msgs = (res && res.messages) || [];
+    return { ok: true, text: formatConversationAsMarkdown(t, msgs), tab: t };
+  } catch (e) {
+    return { ok: false, reason: String(e) };
+  }
+}
+
+function slugifyForFilename(s) {
+  return String(s || "conversation")
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "")   // Windows-invalid chars
+    .replace(/\s+/g, "_")
+    .slice(0, 80) || "conversation";
+}
+
+async function exportCopy() {
+  const r = await getExportMarkdown();
+  if (!r.ok) { flashStatus(r.reason || "Export failed"); return; }
+  try {
+    await navigator.clipboard.writeText(r.text);
+    flashStatus("Copied conversation as markdown");
+  } catch (e) {
+    flashStatus("Clipboard blocked: " + e.message);
+  }
+}
+
+async function exportSave() {
+  const r = await getExportMarkdown();
+  if (!r.ok) { flashStatus(r.reason || "Export failed"); return; }
+  const filename = slugifyForFilename(r.tab.title) + ".md";
+  try {
+    const saved = await window.pywebview.api.save_markdown(filename, r.text);
+    if (saved && saved.ok) flashStatus("Saved to " + saved.path);
+    else if (saved && saved.error) flashStatus("Save failed: " + saved.error);
+    // If saved.ok is false and no error → user cancelled, stay silent
+  } catch (e) {
+    flashStatus("Save failed: " + e.message);
+  }
+}
+
+function flashStatus(msg) {
+  const line = $("#status-line");
+  if (!line) return;
+  const prev = line.textContent;
+  line.textContent = msg;
+  setTimeout(() => { if (line.textContent === msg) line.textContent = prev; }, 3500);
 }
 
 async function pickCwd() {

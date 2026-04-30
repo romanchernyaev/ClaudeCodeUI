@@ -34,7 +34,7 @@ class ClaudeSession:
         self.cwd = cwd or str(Path.home())
         self.model = model
         self.effort = effort
-        self.permission_mode = permission_mode or "bypassPermissions"
+        self.permission_mode = permission_mode or "skipAll"
         self.session_id: str | None = None
         self.proc: subprocess.Popen | None = None
         self._stop = threading.Event()
@@ -91,7 +91,13 @@ class ClaudeSession:
             args += ["--model", self.model]
         if self.effort:
             args += ["--effort", self.effort]
-        args += ["--permission-mode", self.permission_mode]
+        # The special mode "skipAll" maps to --dangerously-skip-permissions,
+        # which bypasses even the sensitive-file prompts that bypassPermissions
+        # still gates. Everything else passes through as a --permission-mode.
+        if self.permission_mode == "skipAll":
+            args += ["--dangerously-skip-permissions"]
+        else:
+            args += ["--permission-mode", self.permission_mode]
         args += [full_prompt]
 
         try:
@@ -160,6 +166,12 @@ class ClaudeSession:
                     self.on_event({"type": "tool_use", "name": b.get("name"), "input": b.get("input")})
                 elif bt == "thinking":
                     self.on_event({"type": "thinking", "text": b.get("thinking", "")})
+                elif bt == "redacted_thinking":
+                    # The CLI sometimes ships an encrypted thinking block whose
+                    # plaintext is hidden. Signal the UI so it can show a
+                    # "[redacted]" toggle rather than pretending there was no
+                    # thinking at all.
+                    self.on_event({"type": "thinking", "text": "[redacted thinking — content hidden by the platform]"})
             usage = msg.get("usage")
             if usage:
                 self.on_event({"type": "usage", "usage": usage})

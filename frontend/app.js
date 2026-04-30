@@ -53,14 +53,24 @@ window.__onClaudeEvent = (ev) => {
     tab.streamedViaDelta = true;
     appendAssistantText(tab, ev.text);
   } else if (ev.type === "text_start") {
-    // finalize any open thinking block
+    // finalize any open thinking block; drop it entirely if it never got text
+    pruneEmptyThinkingBlock(tab);
     tab.thinkingBlockEl = null;
   } else if (ev.type === "thinking_start") {
-    tab.thinkingBlockEl = null; // start a new one on next delta
+    // A new thinking content block is starting. Keep the existing .thinking-body
+    // so consecutive thoughts stay in one collapsible panel, but add a blank line
+    // between them — otherwise "...timestamp.PyInstaller doesn't allow..." runs
+    // together with no gap between the two thoughts.
+    if (tab.thinkingBlockEl && tab.thinkingBlockEl.textContent) {
+      tab.thinkingBlockEl.textContent += "\n\n";
+    }
   } else if (ev.type === "thinking_delta") {
     appendThinkingText(tab, ev.text);
   } else if (ev.type === "thinking") {
-    // Non-streamed thinking (older shape)
+    // Non-streamed thinking (older shape) — each event is a whole thought.
+    if (tab.thinkingBlockEl && tab.thinkingBlockEl.textContent) {
+      tab.thinkingBlockEl.textContent += "\n\n";
+    }
     appendThinkingText(tab, ev.text);
   } else if (ev.type === "tool_use") {
     addToolCall(tab, ev.name, ev.input);
@@ -360,13 +370,29 @@ function startInlineRename(s, itemEl) {
   const commit = async (save) => {
     if (finished) return; finished = true;
     const newTitle = input.value.trim();
+    let effectiveTitle = current;
     if (save && newTitle && newTitle !== current) {
       await window.pywebview.api.rename_session(s.project_id, s.id, newTitle);
+      effectiveTitle = newTitle;
     } else if (save && !newTitle && s.custom_title) {
       // Empty string resets to auto-title
       await window.pywebview.api.rename_session(s.project_id, s.id, "");
+      effectiveTitle = "";  // will be re-derived from the session on next load
     }
     await refreshSessions();
+    // If the renamed session is open in a tab, sync its title so the tab strip reflects the change.
+    if (save) {
+      const fresh = (state.allSessions || []).find(x => x.id === s.id && x.project_id === s.project_id);
+      const syncedTitle = fresh?.title || effectiveTitle || "Conversation";
+      let tabsChanged = false;
+      for (const tab of state.tabs) {
+        if (tab.sessionId === s.id && tab.projectId === s.project_id) {
+          tab.title = syncedTitle;
+          tabsChanged = true;
+        }
+      }
+      if (tabsChanged) renderTabs();
+    }
   };
   input.addEventListener("keydown", (e) => {
     if (e.key === "Enter") { e.preventDefault(); commit(true); }
@@ -949,11 +975,57 @@ function scheduleAssistantRender(t) {
   });
 }
 
+function buildThoughtToggle(text) {
+  // Collapsed-by-default, post-turn thought marker. Clicking expands inline
+  // into the full bordered panel (same look as during streaming).
+  const wrap = el("div", "thought-toggle-wrap");
+  const btn = el("button", "thought-toggle");
+  btn.type = "button";
+  btn.innerHTML = '<span class="thought-toggle-icon">✦</span><span class="thought-toggle-label">Show thought</span>';
+  btn.title = "Show thought";
+  btn.setAttribute("aria-expanded", "false");
+  const panel = el("div", "thought-panel hidden");
+  const body = el("div", "thinking-body");
+  body.textContent = text;
+  panel.appendChild(body);
+  btn.addEventListener("click", () => {
+    const expanded = !panel.classList.contains("hidden");
+    if (expanded) {
+      panel.classList.add("hidden");
+      btn.setAttribute("aria-expanded", "false");
+      btn.querySelector(".thought-toggle-label").textContent = "Show thought";
+    } else {
+      panel.classList.remove("hidden");
+      btn.setAttribute("aria-expanded", "true");
+      btn.querySelector(".thought-toggle-label").textContent = "Hide thought";
+    }
+  });
+  wrap.append(btn, panel);
+  return wrap;
+}
+
+function pruneEmptyThinkingBlock(t) {
+  // Called when the reply stream starts. If the thinking container was created
+  // but never received visible text (redacted / empty thought block), drop it
+  // so the bubble doesn't show a perpetually-empty "THOUGHT" panel.
+  const container = t.thinkingContainer;
+  if (!container) return;
+  const body = container.querySelector(".thinking-body");
+  const txt = (body?.textContent || "").trim();
+  if (!txt) {
+    container.remove();
+    t.thinkingContainer = null;
+    t.thinkingBlockEl = null;
+  }
+}
+
 function appendThinkingText(t, text) {
   if (!t.currentAssistantEl) startAssistantBubble(t);
   if (!t.thinkingBlockEl || !t.currentAssistantEl.contains(t.thinkingBlockEl)) {
     // Create a new thinking block at the top of the current assistant bubble
-    // (before any already-streamed user-facing text).
+    // (before any already-streamed user-facing text). Expanded during streaming
+    // so the user sees thoughts live; finishAssistantTurn swaps this for a
+    // compact "Show thought" pill once the turn completes.
     const block = el("div", "thinking-block");
     const head = el("div", "thinking-head");
     head.innerHTML = '<span class="thinking-icon">✦</span><span class="thinking-label">Thinking…</span><span class="thinking-toggle">hide</span>';
@@ -998,18 +1070,23 @@ function addError(t, msg) {
 }
 
 function finishAssistantTurn(t) {
-  // Finalize thinking block if present (change label from "Thinking…" to "Thought").
+  // If the thinking block ended up empty (redacted / no deltas), drop it so
+  // the user doesn't see a "THOUGHT" panel with nothing in it.
+  pruneEmptyThinkingBlock(t);
+  // Capture the thought text before we wipe the DOM, so we can re-insert it
+  // as a compact inline toggle after the reply is rendered.
+  let thoughtText = "";
   if (t.thinkingContainer) {
-    const label = t.thinkingContainer.querySelector(".thinking-label");
-    if (label) label.textContent = "Thought";
+    const body = t.thinkingContainer.querySelector(".thinking-body");
+    thoughtText = (body?.textContent || "").trim();
   }
   t.thinkingBlockEl = null;
   t.thinkingContainer = null;
   if (t.currentAssistantEl) {
-    // Re-render without the cursor but preserve any thinking block at the top.
-    const existingThinking = t.currentAssistantEl.querySelector(".thinking-block");
     t.currentAssistantEl.innerHTML = renderMarkdown(t.currentAssistantText);
-    if (existingThinking) t.currentAssistantEl.insertBefore(existingThinking, t.currentAssistantEl.firstChild);
+    if (thoughtText) {
+      t.currentAssistantEl.insertBefore(buildThoughtToggle(thoughtText), t.currentAssistantEl.firstChild);
+    }
   }
   clearThinkingIndicator(t);
   // Hide typing bar only if no other tabs are streaming.
@@ -1039,12 +1116,26 @@ function addUserBubble(t, text) {
   const body = el("div", "body");
   body.innerHTML = renderMarkdown(text);
   if (t.attachments.length) {
-    const atts = el("div", "");
-    atts.style.display = "flex"; atts.style.gap = "6px"; atts.style.marginTop = "8px";
+    const atts = el("div", "bubble-attachments");
     t.attachments.forEach(a => {
-      const img = document.createElement("img");
-      img.src = a.b64; img.style.maxWidth = "120px"; img.style.borderRadius = "6px";
-      atts.appendChild(img);
+      const isImage = a.kind === "image" || (!a.kind && (a.mime || "").startsWith("image/"));
+      if (isImage) {
+        const img = document.createElement("img");
+        img.src = a.b64;
+        img.alt = a.name || "";
+        img.className = "bubble-image";
+        atts.appendChild(img);
+      } else {
+        const pill = el("div", "bubble-file");
+        pill.appendChild(el("span", "bubble-file-icon", fileIconFor(a.name)));
+        const meta = el("div", "bubble-file-meta");
+        const name = el("div", "bubble-file-name", a.name || "file");
+        name.title = a.name || "";
+        meta.appendChild(name);
+        if (a.size) meta.appendChild(el("div", "bubble-file-size", formatBytes(a.size)));
+        pill.appendChild(meta);
+        atts.appendChild(pill);
+      }
     });
     body.appendChild(atts);
   }
@@ -1202,6 +1293,7 @@ function fileIconFor(name) {
   const ext = (name || "").toLowerCase().split(".").pop() || "";
   if (["xlsx", "xlsm", "xls", "ods", "csv", "tsv"].includes(ext)) return "📊";
   if (["docx", "doc", "odt", "rtf"].includes(ext)) return "📝";
+  if (["pptx", "ppt", "odp"].includes(ext)) return "📽";
   if (ext === "pdf") return "📕";
   if (["txt", "md", "log"].includes(ext)) return "📄";
   if (["json", "yaml", "yml", "toml", "xml", "ini"].includes(ext)) return "🗂";

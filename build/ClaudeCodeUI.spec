@@ -35,6 +35,8 @@ a = Analysis(
         "docx",
         "docx.oxml",
         "pypdf",
+        "pptx",
+        "pptx.util",
         "odf",
         "odf.opendocument",
         "odf.text",

@@ -55,7 +55,7 @@ TEXT_EXTS = {
 }
 
 # Extensions we try to convert to text.
-OFFICE_EXTS = {".xlsx", ".xlsm", ".xls", ".docx", ".odt", ".ods", ".pdf"}
+OFFICE_EXTS = {".xlsx", ".xlsm", ".xls", ".docx", ".odt", ".ods", ".pdf", ".pptx", ".odp"}
 
 
 def _safe_name(name: str) -> str:
@@ -193,6 +193,58 @@ def _odt_to_markdown(path: Path) -> str:
     return "\n".join(out)
 
 
+def _pptx_to_markdown(path: Path) -> str:
+    """Each slide → its own heading with bullet-point bodies and table extraction."""
+    from pptx import Presentation
+    prs = Presentation(str(path))
+    out: list[str] = []
+    for i, slide in enumerate(prs.slides, start=1):
+        title = ""
+        try:
+            if slide.shapes.title and slide.shapes.title.has_text_frame:
+                title = (slide.shapes.title.text_frame.text or "").strip()
+        except Exception:
+            pass
+        out.append(f"## Slide {i}" + (f" — {title}" if title else ""))
+        for shape in slide.shapes:
+            # Skip the title placeholder — already in the heading.
+            try:
+                if shape == slide.shapes.title:
+                    continue
+            except Exception:
+                pass
+            if getattr(shape, "has_text_frame", False) and shape.text_frame:
+                for para in shape.text_frame.paragraphs:
+                    text = (para.text or "").strip()
+                    if text:
+                        out.append(f"- {text}")
+            elif getattr(shape, "has_table", False):
+                rows = [[(cell.text or "").replace("|", "\\|").replace("\n", " ").strip()
+                         for cell in row.cells]
+                        for row in shape.table.rows]
+                if rows:
+                    width = max(len(r) for r in rows)
+                    for r in rows:
+                        while len(r) < width:
+                            r.append("")
+                    out.append("")
+                    out.append("| " + " | ".join(rows[0]) + " |")
+                    out.append("| " + " | ".join(["---"] * width) + " |")
+                    for r in rows[1:]:
+                        out.append("| " + " | ".join(r) + " |")
+        # Speaker notes, when present.
+        try:
+            if slide.has_notes_slide:
+                notes = (slide.notes_slide.notes_text_frame.text or "").strip()
+                if notes:
+                    out.append("")
+                    out.append(f"_Notes:_ {notes}")
+        except Exception:
+            pass
+        out.append("")
+    return "\n".join(out)
+
+
 def _pdf_to_text(path: Path) -> str:
     from pypdf import PdfReader
     r = PdfReader(str(path))
@@ -228,6 +280,14 @@ def convert_office(path: Path) -> tuple[Path, str] | None:
             content = _pdf_to_text(path)
             kind = "pdf"
             out_ext = ".txt"
+        elif ext == ".pptx":
+            content = _pptx_to_markdown(path)
+            kind = "presentation"
+            out_ext = ".md"
+        elif ext == ".odp":
+            content = _odt_to_markdown(path)
+            kind = "presentation"
+            out_ext = ".md"
         else:
             return None
     except Exception as e:

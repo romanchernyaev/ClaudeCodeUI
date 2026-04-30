@@ -198,7 +198,7 @@ async function takeScreenshot() {
       if (res && res.error) addError(t, "Screenshot failed: " + res.error);
       return;
     }
-    t.attachments.push({ b64: res.data_url, name: "screenshot.png" });
+    t.attachments.push({ kind: "image", b64: res.data_url, name: "screenshot.png" });
     renderAttachments();
     $("#input").focus();
   } catch (e) {
@@ -1156,8 +1156,11 @@ async function send() {
   } else {
     await window.pywebview.api.update_runner_settings(t.id, t.model || null, t.effort || null, t.permissionMode);
   }
-  const imgs = t.attachments.map(a => a.b64);
-  await window.pywebview.api.send_message(t.id, text, imgs);
+  const imgs = t.attachments.filter(a => a.kind === "image").map(a => a.b64);
+  const files = t.attachments
+    .filter(a => a.kind === "file")
+    .map(a => ({ name: a.name, data_b64: a.b64, mime: a.mime || "" }));
+  await window.pywebview.api.send_message(t.id, text, imgs, files);
   input.value = "";
   t.attachments = [];
   renderAttachments();
@@ -1170,23 +1173,68 @@ function renderAttachments() {
   box.innerHTML = "";
   const t = activeTab(); if (!t) return;
   t.attachments.forEach((a, i) => {
-    const chip = el("div", "attachment-chip");
-    const img = document.createElement("img"); img.src = a.b64;
-    chip.appendChild(img);
+    const isImage = a.kind === "image" || (a.mime || "").startsWith("image/") || !a.kind;
+    const chip = el("div", isImage ? "attachment-chip" : "attachment-chip file-chip");
+    if (isImage) {
+      const img = document.createElement("img");
+      img.src = a.b64;
+      img.alt = a.name || "";
+      chip.appendChild(img);
+    } else {
+      const icon = el("div", "file-chip-icon", fileIconFor(a.name));
+      const name = el("div", "file-chip-name", a.name || "file");
+      name.title = a.name || "";
+      const size = el("div", "file-chip-size", formatBytes(a.size));
+      chip.appendChild(icon);
+      chip.appendChild(name);
+      chip.appendChild(size);
+    }
     const rm = el("button", "remove", "×");
+    rm.title = "Remove attachment";
+    rm.setAttribute("aria-label", "Remove attachment");
     rm.addEventListener("click", () => { t.attachments.splice(i, 1); renderAttachments(); });
     chip.appendChild(rm);
     box.appendChild(chip);
   });
 }
 
+function fileIconFor(name) {
+  const ext = (name || "").toLowerCase().split(".").pop() || "";
+  if (["xlsx", "xlsm", "xls", "ods", "csv", "tsv"].includes(ext)) return "📊";
+  if (["docx", "doc", "odt", "rtf"].includes(ext)) return "📝";
+  if (ext === "pdf") return "📕";
+  if (["txt", "md", "log"].includes(ext)) return "📄";
+  if (["json", "yaml", "yml", "toml", "xml", "ini"].includes(ext)) return "🗂";
+  if (["js", "ts", "py", "java", "go", "rs", "cs", "cpp", "c", "h", "sql", "sh", "ps1"].includes(ext)) return "💻";
+  return "📎";
+}
+
+function formatBytes(n) {
+  if (!n && n !== 0) return "";
+  if (n < 1024) return n + " B";
+  if (n < 1024 * 1024) return Math.round(n / 1024) + " KB";
+  return (n / 1024 / 1024).toFixed(1) + " MB";
+}
+
+const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;  // 25 MB per file; protects the IPC bridge from a huge base64 string
+
 function handleFiles(files) {
   const t = activeTab(); if (!t) return;
   Array.from(files).forEach(f => {
-    if (!f.type.startsWith("image/")) return;
+    if (f.size > MAX_ATTACHMENT_BYTES) {
+      addError(t, `${f.name} is too large (${Math.round(f.size / 1024 / 1024)} MB, max 25 MB)`);
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
-      t.attachments.push({ b64: reader.result, name: f.name });
+      const isImage = (f.type || "").startsWith("image/");
+      t.attachments.push({
+        kind: isImage ? "image" : "file",
+        b64: reader.result,
+        name: f.name,
+        mime: f.type || "",
+        size: f.size,
+      });
       renderAttachments();
     };
     reader.readAsDataURL(f);
@@ -1218,14 +1266,17 @@ function wireUI() {
 
   input.addEventListener("paste", (e) => {
     const items = e.clipboardData?.items || [];
-    let handled = false;
+    const blobs = [];
     for (const it of items) {
-      if (it.type.startsWith("image/")) {
+      if (it.kind === "file") {
         const blob = it.getAsFile();
-        if (blob) { handleFiles([blob]); handled = true; }
+        if (blob) blobs.push(blob);
       }
     }
-    if (handled) e.preventDefault();
+    if (blobs.length) {
+      handleFiles(blobs);
+      e.preventDefault();
+    }
   });
 
   ["dragover","drop"].forEach(evn => document.addEventListener(evn, (e) => e.preventDefault()));

@@ -41,11 +41,15 @@ class ClaudeSession:
         self._q: queue.Queue = queue.Queue()
         self.cli = find_claude_cli()
 
-    def send(self, prompt: str, images: list[str] | None = None):
-        """Start a new turn. Kills any currently running turn."""
+    def send(self, prompt: str, images: list[str] | None = None, files: list[dict] | None = None):
+        """Start a new turn. Kills any currently running turn.
+
+        files: list of {name, ref_path, kind} — non-image attachments. ref_path is
+        what we inject into the prompt so Claude's Read tool picks them up.
+        """
         self.interrupt()
         self._stop.clear()
-        t = threading.Thread(target=self._run_turn, args=(prompt, images or []), daemon=True)
+        t = threading.Thread(target=self._run_turn, args=(prompt, images or [], files or []), daemon=True)
         t.start()
 
     def interrupt(self):
@@ -58,17 +62,27 @@ class ClaudeSession:
                 pass
         self.proc = None
 
-    def _run_turn(self, prompt: str, images: list[str]):
+    def _run_turn(self, prompt: str, images: list[str], files: list[dict]):
         if not self.cli:
             self.on_event({"type": "error", "message": "claude CLI not found. Expected at ~/.local/bin/claude.exe"})
             self.on_event({"type": "done"})
             return
 
-        # Build the prompt. If images were attached we reference them as file paths on a new line.
-        full_prompt = prompt
+        # Build the prompt. Images are referenced as [image: path]; files are listed
+        # as absolute paths so Claude's Read tool picks them up on its own.
+        parts: list[str] = [prompt] if prompt else []
         if images:
-            refs = "\n".join(f"[image: {p}]" for p in images)
-            full_prompt = f"{prompt}\n\n{refs}"
+            parts.append("\n".join(f"[image: {p}]" for p in images))
+        if files:
+            lines = ["Attached files (use the Read tool to inspect):"]
+            for f in files:
+                name = f.get("name") or ""
+                ref = f.get("ref_path") or ""
+                kind = f.get("kind") or "file"
+                label = f" ({kind})" if kind and kind not in ("text", "binary") else ""
+                lines.append(f"- {name}{label}: {ref}")
+            parts.append("\n".join(lines))
+        full_prompt = "\n\n".join(p for p in parts if p)
 
         args = [self.cli, "--print", "--output-format", "stream-json", "--verbose", "--include-partial-messages"]
         if self.session_id:

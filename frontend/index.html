@@ -148,7 +148,7 @@
         <div id="attachments" class="attachments"></div>
         <div class="composer-row">
           <div class="attach-wrap">
-            <button id="attach-btn" class="icon-btn big" title="Attach image" aria-label="Attach image" aria-haspopup="menu">📎</button>
+            <button id="attach-btn" class="icon-btn big" title="Attach file or image" aria-label="Attach file or image" aria-haspopup="menu">📎</button>
             <div id="attach-menu" class="attach-menu hidden">
               <div class="attach-menu-item" data-action="upload">
                 <span class="attach-menu-icon">📂</span>
@@ -161,14 +161,14 @@
             </div>
           </div>
           <div class="input-wrap">
-            <textarea id="input" placeholder="Reply to Claude…  (paste images, drag-drop files, / for commands, ↑ to edit last)" rows="1"></textarea>
+            <textarea id="input" placeholder="Reply to Claude…  (drag-drop or paste files, / for commands, ↑ to edit last)" rows="1"></textarea>
             <div id="slash-popup" class="slash-popup hidden"></div>
           </div>
           <button id="send-btn" class="send-btn" title="Send (Enter)" aria-label="Send message">↑</button>
           <button id="stop-btn" class="send-btn stop hidden" title="Stop (Esc)" aria-label="Stop generation">■</button>
         </div>
         <div class="composer-hint">
-          <span id="composer-hint-text">Enter to send · Shift+Enter newline · / for commands · Ctrl+V to paste image</span>
+          <span id="composer-hint-text">Enter to send · Shift+Enter newline · / for commands · drag-drop or paste to attach</span>
         </div>
       </div>
     </main>
@@ -224,7 +224,7 @@
     </div>
   </div>
 
-  <input type="file" id="file-input" accept="image/*" multiple hidden />
+  <input type="file" id="file-input" multiple hidden />
   <script src="marked.min.js"></script>
   <script src="highlight.min.js"></script>
   <script src="app.js"></script>

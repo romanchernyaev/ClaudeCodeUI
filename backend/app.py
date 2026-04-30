@@ -59,6 +59,7 @@ from session_meta import set_title as _set_title, set_pinned as _set_pinned
 from claude_runner import ClaudeSession, find_claude_cli
 from slash_commands import list_slash_commands
 from version import __version__ as APP_VERSION
+import file_attachments
 
 GITHUB_OWNER = "romanchernyaev"
 GITHUB_REPO = "ClaudeCodeUI"
@@ -125,6 +126,7 @@ def _cleanup_old_images(max_age_hours: int = 24):
 
 
 _cleanup_old_images()
+file_attachments.cleanup_old_files()
 
 
 def _push_event(tab_id: str, ev: dict):
@@ -245,7 +247,8 @@ class Api:
                 r.permission_mode = permission_mode
         return {"ok": True}
 
-    def send_message(self, tab_id: str, text: str, images_b64: list[str] | None = None):
+    def send_message(self, tab_id: str, text: str, images_b64: list[str] | None = None,
+                     files: list[dict] | None = None):
         r = _runners.get(tab_id)
         if not r:
             r = ClaudeSession(on_event=_make_callback(tab_id))
@@ -266,7 +269,18 @@ class Api:
                 image_paths.append(str(p))
             except Exception as e:
                 _push_event(tab_id, {"type": "error", "message": f"image decode failed: {e}"})
-        r.send(text, image_paths)
+        materialized: list[dict] = []
+        if files:
+            try:
+                materialized = file_attachments.materialize(files)
+            except Exception as e:
+                _push_event(tab_id, {"type": "error", "message": f"file attachment failed: {e}"})
+                materialized = []
+            for m in materialized:
+                if m.get("kind") == "error":
+                    _push_event(tab_id, {"type": "error",
+                                         "message": f"attachment {m.get('name')}: {m.get('error')}"})
+        r.send(text, image_paths, materialized)
         return {"ok": True}
 
     def interrupt(self, tab_id: str):

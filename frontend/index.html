@@ -183,7 +183,8 @@
       <label class="settings-row">
         <div class="settings-label">Permission mode</div>
         <select id="permission-mode" class="model-select">
-          <option value="bypassPermissions" selected>bypassPermissions (no prompts)</option>
+          <option value="skipAll" selected>skipAll (dangerous — skips sensitive-file prompts)</option>
+          <option value="bypassPermissions">bypassPermissions (still prompts on sensitive files)</option>
           <option value="default">default</option>
           <option value="acceptEdits">acceptEdits</option>
           <option value="auto">auto</option>
